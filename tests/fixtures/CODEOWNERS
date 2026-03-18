@@ -1,0 +1,6 @@
+# Test CODEOWNERS file
+# Since this file lives at tests/fixtures/CODEOWNERS, the inferred repo root
+# is tests/fixtures/ — so patterns match paths relative to that directory.
+* @default-team
+*.ts @test-team
+*.vue @frontend-team

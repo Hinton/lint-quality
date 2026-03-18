@@ -1,0 +1,57 @@
+extensions = ["js", "ts", "html", "mjs", "cjs"]
+
+codeowners = "../clients/.github/CODEOWNERS"
+
+[[patterns]]
+name = "eslint-disable-next-line"
+regex = '//\s*eslint-disable-next-line(?:\s+(.+))?$'
+category = "eslint"
+extract_rules = true
+
+[[patterns]]
+name = "eslint-disable-line"
+regex = '//\s*eslint-disable-line(?:\s+(.+))?$'
+category = "eslint"
+extract_rules = true
+
+[[patterns]]
+name = "eslint-disable-block"
+regex = '/\*\s*eslint-disable\s+([^*]*?)\s*\*/'
+category = "eslint"
+extract_rules = true
+
+[[patterns]]
+name = "eslint-disable-block-all"
+regex = '/\*\s*eslint-disable\s*\*/'
+category = "eslint"
+extract_rules = true
+
+[[patterns]]
+name = "eslint-disable-file"
+regex = '/\*\s*eslint-disable\s*$'
+category = "eslint"
+extract_rules = true
+
+[[patterns]]
+name = "eslint-disable-file-rules"
+regex = '^/\*\s*eslint-disable\s+([^*]+?)\s*$'
+category = "eslint"
+extract_rules = true
+
+[[patterns]]
+name = "eslint-disable-html"
+regex = '<!--\s*eslint-disable(?:-next-line)?(?:\s+([^-][^>]*?))?\s*-->'
+category = "eslint"
+extract_rules = true
+
+[[patterns]]
+name = "ts-ignore"
+regex = '//\s*@ts-ignore'
+category = "typescript"
+extract_rules = false
+
+[[patterns]]
+name = "ts-expect-error"
+regex = '//\s*@ts-expect-error'
+category = "typescript"
+extract_rules = false
