@@ -13,12 +13,14 @@ mod scanner;
 use anyhow::{Result, bail};
 use chrono::Utc;
 use clap::Parser;
+use std::io::Read;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use cli::{Cli, Commands};
 use config::{ConfigFile, discover_config, load_config_file, resolve_config};
 use model::{Report, ReportMetadata, ScanResult};
+use output::{human, json, tui};
 use patterns::compile_patterns;
 
 fn main() -> Result<()> {
@@ -64,13 +66,32 @@ fn main() -> Result<()> {
 
             let report = build_report(scan_result, &resolved, resolved_config_path, duration);
 
-            match resolved.format.as_str() {
-                "json" => println!("{}", output::json::format_json(&report)?),
-                _ => print!("{}", output::human::format_human(&report)),
-            }
+            print_report(&report, &resolved.format)?;
+        }
+
+        Commands::Read { path, format } => {
+            let json_str = if path == "-" {
+                let mut buf = String::new();
+                std::io::stdin().read_to_string(&mut buf)?;
+                buf
+            } else {
+                std::fs::read_to_string(&path)?
+            };
+
+            let report: Report = serde_json::from_str(&json_str)?;
+            print_report(&report, &format)?;
         }
     }
 
+    Ok(())
+}
+
+fn print_report(report: &Report, format: &str) -> Result<()> {
+    match format {
+        "json" => println!("{}", json::format_json(report)?),
+        "tui" => tui::run_tui(report)?,
+        _ => print!("{}", human::format_human(report)),
+    }
     Ok(())
 }
 

@@ -23,7 +23,7 @@ pub enum Commands {
         paths: Vec<PathBuf>,
 
         /// Output format
-        #[arg(long, value_parser = ["human", "json"])]
+        #[arg(long, value_parser = ["human", "json", "tui"])]
         format: Option<String>,
 
         /// Path to config file (overrides auto-discovery)
@@ -37,5 +37,16 @@ pub enum Commands {
         /// File extensions to scan (comma-separated)
         #[arg(long, value_delimiter = ',')]
         extensions: Option<Vec<String>>,
+    },
+
+    /// Read a previously saved JSON report
+    Read {
+        /// Path to the JSON report file (use "-" for stdin)
+        #[arg()]
+        path: String,
+
+        /// Output format
+        #[arg(long, value_parser = ["human", "json"], default_value = "human")]
+        format: String,
     },
 }
