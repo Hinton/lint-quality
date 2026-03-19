@@ -7,7 +7,7 @@
 use glob::Pattern;
 use std::path::{Path, PathBuf};
 
-use crate::model::FileReport;
+use crate::scan::FileReport;
 
 /// A single rule from a CODEOWNERS file: glob patterns and their associated owners.
 struct OwnerRule {

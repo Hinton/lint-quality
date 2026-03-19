@@ -14,7 +14,7 @@ use ratatui::{
     layout::{Constraint, Layout},
 };
 
-use crate::model::Report;
+use crate::report::Report;
 
 use app::{App, DATA_VIEWS, DataView, Focus};
 use widgets::{draw_data_panel, draw_filter_panel, draw_footer, draw_header};

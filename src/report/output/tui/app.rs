@@ -4,7 +4,7 @@ use ratatui::widgets::TableState;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use crate::model::Report;
+use crate::report::Report;
 
 use super::tree::{DirTreeRow, build_dir_tree};
 
@@ -434,8 +434,10 @@ fn sorted_vec(map: HashMap<String, usize>) -> Vec<(String, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{FileReport, Report, ReportMetadata, Violation};
+    use crate::report::analysis::build_summary;
+    use crate::scan::{FileReport, Violation};
     use chrono::Utc;
+    use crate::report::{Report, ReportMetadata};
 
     fn make_violation(pattern: &str, category: &str, rules: &[&str]) -> Violation {
         Violation {
@@ -448,7 +450,6 @@ mod tests {
     }
 
     fn make_report(files: Vec<FileReport>) -> Report {
-        use crate::analysis::build_summary;
         let summary = build_summary(&files);
         Report {
             metadata: ReportMetadata {

@@ -4,7 +4,9 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::model::{FileReport, ReportSummary};
+use crate::scan::FileReport;
+
+use super::ReportSummary;
 
 /// Build a summary with violation counts broken down by multiple dimensions.
 /// Directory counts are hierarchical: each violation increments all ancestor directories.

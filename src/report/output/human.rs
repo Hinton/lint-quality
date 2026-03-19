@@ -1,6 +1,6 @@
 //! Human-readable terminal report with aligned columns, percentage breakdowns, and color.
 
-use crate::model::Report;
+use crate::report::Report;
 use colored::Colorize;
 use std::fmt::Write;
 

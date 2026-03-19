@@ -11,6 +11,33 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 
+/// Load the config file, either from an explicit path or by auto-discovering
+/// `lint-quality.toml` in parent directories of the scan target.
+pub fn load_config(
+    config_path: &Option<PathBuf>,
+    scan_paths: &[PathBuf],
+) -> Result<(Option<ConfigFile>, Option<String>)> {
+    match config_path {
+        Some(p) => Ok((
+            Some(load_config_file(p)?),
+            Some(p.to_string_lossy().to_string()),
+        )),
+        None => {
+            let start = scan_paths
+                .first()
+                .map(|p| p.as_path())
+                .unwrap_or(".".as_ref());
+            match discover_config(start) {
+                Some(p) => {
+                    let display = p.to_string_lossy().to_string();
+                    Ok((load_config_file(&p).ok(), Some(display)))
+                }
+                None => Ok((None, None)),
+            }
+        }
+    }
+}
+
 /// Raw deserialized content of a `lint-quality.toml` config file.
 /// All fields are optional except `patterns` — without patterns, nothing will be detected.
 #[derive(Debug, Deserialize, Default)]

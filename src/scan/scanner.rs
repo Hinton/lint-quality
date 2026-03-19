@@ -7,8 +7,8 @@ use anyhow::Result;
 use ignore::WalkBuilder;
 use std::path::Path;
 
-use crate::model::{FileReport, ScanResult, Violation};
-use crate::patterns::CompiledPattern;
+use super::model::{FileReport, ScanResult, Violation};
+use super::patterns::CompiledPattern;
 
 /// Walk the given paths, read files matching the allowed extensions, and return
 /// all detected violations along with the total number of files scanned.

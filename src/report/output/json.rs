@@ -1,6 +1,6 @@
 //! JSON report output via serde serialization.
 
-use crate::model::Report;
+use crate::report::Report;
 use anyhow::Result;
 
 /// Serialize the report to pretty-printed JSON.

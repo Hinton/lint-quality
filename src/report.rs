@@ -1,35 +1,16 @@
-//! Core data types shared across the scan pipeline: violations, file reports,
-//! scan results, metadata, summaries, and the top-level report.
+//! Report domain: report types, construction, analysis, and output formatting.
 
+pub(crate) mod analysis;
+pub mod output;
+
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::time::Duration;
 
-/// A single lint suppression found in source code.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Violation {
-    /// 1-based line number where the suppression appears.
-    pub line: usize,
-    /// Name of the matched pattern (e.g. "eslint-disable-next-line", "ts-ignore").
-    pub pattern: String,
-    /// Category grouping the pattern (e.g. "eslint", "typescript").
-    pub category: String,
-    /// Specific lint rules being suppressed. Empty for patterns that don't specify rules
-    /// (like `@ts-ignore`). Contains `["*"]` when all rules are suppressed.
-    pub rules: Vec<String>,
-    /// The raw source line text (trimmed).
-    pub raw_text: String,
-}
-
-/// All violations found in a single file, along with its CODEOWNERS owner.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileReport {
-    pub path: String,
-    /// CODEOWNERS owner for this file, if resolved. Omitted from JSON when `None`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<String>,
-    pub violations: Vec<Violation>,
-}
+use crate::config::ResolvedConfig;
+use crate::scan::{FileReport, ScanResult};
 
 /// Metadata about a scan run, included in every report for traceability.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,14 +39,6 @@ pub struct ReportSummary {
     pub by_owner: HashMap<String, usize>,
 }
 
-/// Result of scanning one or more directory trees.
-pub struct ScanResult {
-    /// Files that contained at least one violation.
-    pub files: Vec<FileReport>,
-    /// Total files read (including those with no violations).
-    pub files_scanned: usize,
-}
-
 /// Complete scan report: metadata, per-file violations, and summary aggregations.
 /// Self-contained so multiple reports can be loaded for trend comparison.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,4 +46,40 @@ pub struct Report {
     pub metadata: ReportMetadata,
     pub files: Vec<FileReport>,
     pub summary: ReportSummary,
+}
+
+/// Assemble a report from scan results, resolved config, and timing info.
+pub fn build(
+    scan_result: ScanResult,
+    resolved: &ResolvedConfig,
+    config_path: Option<String>,
+    duration: Duration,
+) -> Report {
+    let summary = analysis::build_summary(&scan_result.files);
+    Report {
+        metadata: ReportMetadata {
+            timestamp: Utc::now(),
+            tool_version: env!("CARGO_PKG_VERSION").to_string(),
+            scanned_paths: resolved
+                .scan_paths
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect(),
+            config_path,
+            files_scanned: scan_result.files_scanned,
+            scan_duration_ms: duration.as_millis() as u64,
+        },
+        files: scan_result.files,
+        summary,
+    }
+}
+
+/// Print a report in the given format ("human", "json", or "tui").
+pub fn print(report: &Report, format: &str) -> Result<()> {
+    match format {
+        "json" => println!("{}", output::json::format_json(report)?),
+        "tui" => output::tui::run_tui(report)?,
+        _ => print!("{}", output::human::format_human(report)),
+    }
+    Ok(())
 }
