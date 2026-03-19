@@ -6,6 +6,7 @@ mod config;
 mod owners;
 mod report;
 mod scan;
+mod trend;
 
 use anyhow::{Result, bail};
 use clap::Parser;
@@ -60,6 +61,14 @@ fn main() -> Result<()> {
 
             let report = report::build(scan_result, &resolved, resolved_config_path, duration);
             report::print(&report, &resolved.format)?;
+        }
+
+        Commands::Trend {
+            paths,
+            port,
+            no_open,
+        } => {
+            trend::run(paths, port, no_open)?;
         }
 
         Commands::Read { path, format } => {

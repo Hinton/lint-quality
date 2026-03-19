@@ -17,3 +17,11 @@ anyhow = "1"
 colored = "3"
 ratatui = "0.30"
 crossterm = "0.29"
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+open = "5"
+rust-embed = "8"
+mime_guess = "2"
+
+[dev-dependencies]
+tempfile = "3"

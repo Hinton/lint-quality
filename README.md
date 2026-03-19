@@ -150,6 +150,56 @@ extract_rules = true
 
 The config file is auto-discovered by walking up from the scan directory, or specified explicitly with `--config`. CLI args override config file values; patterns are config-file-only.
 
+## Trend dashboard
+
+Compare reports over time with an interactive web dashboard.
+
+```sh
+# Launch dashboard from a directory of JSON reports
+lint-quality trend reports/
+
+# Launch from specific report files
+lint-quality trend report-jan.json report-feb.json report-mar.json
+
+# Custom port, don't auto-open browser
+lint-quality trend reports/ --port 9000 --no-open
+```
+
+The dashboard shows all dimensions (total, owner, category, rule, pattern, directory) on a single page with:
+
+- **Trend charts** — violation counts over time for each dimension
+- **Summary tables** — first vs. latest report comparison with delta and percent change
+- **Directory tree** — collapsible hierarchical view of violations by directory
+- **Filter builder** — add cross-dimensional filters (e.g. filter by owner + rule simultaneously)
+- **Insights** — auto-generated observations about biggest improvements and regressions
+- **Drag & drop** — upload additional JSON reports directly in the browser
+
+### Generating reports for trending
+
+Save JSON reports from each scan run, e.g. in CI:
+
+```sh
+lint-quality scan src --format json > reports/$(date +%Y-%m-%d).json
+```
+
+Then visualize the trend:
+
+```sh
+lint-quality trend reports/
+```
+
+## Reading saved reports
+
+Re-render a previously saved JSON report:
+
+```sh
+# Re-render as human-readable output
+lint-quality read report.json
+
+# Read from stdin
+cat report.json | lint-quality read -
+```
+
 ## JSON output
 
 The JSON output is file-centric with pre-computed summaries:

@@ -39,6 +39,21 @@ pub enum Commands {
         extensions: Option<Vec<String>>,
     },
 
+    /// Launch a web dashboard to visualize trends across multiple reports
+    Trend {
+        /// Paths to JSON report files or directories containing them
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
+
+        /// Port for the web server
+        #[arg(long, default_value = "8081")]
+        port: u16,
+
+        /// Don't automatically open the browser
+        #[arg(long)]
+        no_open: bool,
+    },
+
     /// Read a previously saved JSON report
     Read {
         /// Path to the JSON report file (use "-" for stdin)

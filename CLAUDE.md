@@ -19,16 +19,22 @@ Rust edition 2024. Integration tests are in `tests/integration.rs` and use test 
 
 ## Architecture
 
-The scan pipeline flows through these modules in order:
+Domain-driven module structure. No `mod.rs` files — use the `name.rs` + `name/` pattern instead.
 
-1. **cli** — clap derive-based argument parsing. Two subcommands: `scan` and `read`.
-2. **config** — Loads `lint-quality.toml` (auto-discovered by walking up directories or explicit `--config`). Merges defaults → config file → CLI overrides into `ResolvedConfig`. Patterns are config-file-only.
-3. **patterns** — Compiles `PatternConfig` regex strings into `CompiledPattern` structs with rule extraction logic.
-4. **scanner** — Walks directories with the `ignore` crate (respects `.gitignore`), filters by extension, tests each line against compiled patterns, produces `ScanResult`.
-5. **owners** — Parses CODEOWNERS files and assigns owners to file reports (last-match-wins semantics).
-6. **report** — Builds the full `Report` with metadata and pre-computed summaries (by_pattern, by_category, by_rule, by_directory, by_owner).
-7. **output** — Three formatters: `human` (colored terminal), `json` (serialized Report), `tui` (ratatui interactive browser).
-
-Core data types live in **model** (`Violation`, `FileReport`, `ScanResult`, `Report`, `ReportSummary`).
+- **cli** — clap derive-based argument parsing. Subcommands: `scan`, `read`, `trend`.
+- **config** (`config.rs`) — Loads `lint-quality.toml` (auto-discovered by walking up directories or explicit `--config`). Merges defaults → config file → CLI overrides into `ResolvedConfig`. Patterns are config-file-only.
+- **scan** (`scan.rs` + `scan/`) — Scan domain. Owns `Violation`, `FileReport`, `ScanResult` types.
+  - `scan/patterns.rs` — Compiles `PatternConfig` regex strings into `CompiledPattern` with rule extraction.
+  - `scan/scanner.rs` — Walks directories with the `ignore` crate (respects `.gitignore`), filters by extension, matches lines.
+  - `scan/model.rs` — Scan domain types.
+- **owners** (`owners.rs`) — Parses CODEOWNERS files and assigns owners to file reports (last-match-wins semantics).
+- **report** (`report.rs` + `report/`) — Report domain. Owns `Report`, `ReportMetadata`, `ReportSummary` types, plus `build()` and `print()`.
+  - `report/analysis.rs` — Aggregates violations into summary counts by multiple dimensions.
+  - `report/output.rs` + `report/output/` — Three formatters: `human` (colored terminal), `json` (serialized Report), `tui` (ratatui interactive browser).
+- **trend** — Loads multiple JSON reports and serves a trend dashboard.
 
 The `read` subcommand deserializes a previously saved JSON report and re-renders it in a chosen format.
+
+## Conventions
+
+- **TypeScript file naming**: Use kebab-case (dash-separated words), not camelCase. E.g. `api-client.ts`, not `apiClient.ts`.
