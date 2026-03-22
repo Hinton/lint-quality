@@ -7,24 +7,22 @@
 use glob::Pattern;
 use std::path::{Path, PathBuf};
 
-use crate::scan::FileReport;
-
 /// A single rule from a CODEOWNERS file: glob patterns and their associated owners.
-struct OwnerRule {
+struct Rule {
     /// Primary pattern. For directory-like patterns, a `/**` variant is also stored.
     patterns: Vec<Pattern>,
     owners: Vec<String>,
 }
 
 /// Parsed CODEOWNERS file. Rules are stored in order; last match wins (GitHub semantics).
-pub struct Owners {
-    rules: Vec<OwnerRule>,
+pub struct CodeOwners {
+    rules: Vec<Rule>,
     /// Absolute path to the repo root, derived from the CODEOWNERS file location.
     /// File paths are made relative to this before matching.
     repo_root: PathBuf,
 }
 
-impl Owners {
+impl CodeOwners {
     /// Load and parse a CODEOWNERS file. Returns `None` on read errors.
     ///
     /// The repo root is inferred from the file location:
@@ -33,17 +31,15 @@ impl Owners {
     /// - `CODEOWNERS` at repo root → repo root is the parent
     pub fn from_file(path: &Path) -> Option<Self> {
         let abs_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        let contents = match std::fs::read_to_string(&abs_path) {
-            Ok(c) => c,
-            Err(e) => {
+        let contents = std::fs::read_to_string(&abs_path)
+            .map_err(|e| {
                 eprintln!(
                     "Warning: failed to read CODEOWNERS {}: {}",
                     path.display(),
                     e
                 );
-                return None;
-            }
-        };
+            })
+            .ok()?;
 
         // Derive repo root: CODEOWNERS can live at root, .github/, or docs/
         let parent = abs_path.parent()?;
@@ -58,65 +54,57 @@ impl Owners {
         Some(Self { rules, repo_root })
     }
 
-    fn parse_rules(contents: &str) -> Vec<OwnerRule> {
-        let mut rules = Vec::new();
-
-        for line in contents.lines() {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
-
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            if parts.len() < 2 {
-                continue;
-            }
-
-            let raw_pattern = parts[0];
-            let owners: Vec<String> = parts[1..].iter().map(|s| s.to_string()).collect();
-
-            let glob_strs = codeowners_pattern_to_globs(raw_pattern);
-            let mut patterns = Vec::new();
-            for gs in &glob_strs {
-                match Pattern::new(gs) {
-                    Ok(p) => patterns.push(p),
-                    Err(_) => eprintln!("Warning: invalid CODEOWNERS pattern: {raw_pattern}"),
+    fn parse_rules(contents: &str) -> Vec<Rule> {
+        contents
+            .lines()
+            .map(str::trim)
+            // Skip blank lines and comments
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .filter_map(|line| {
+                let mut parts = line.split_whitespace();
+                let raw_pattern = parts.next()?;
+                let owners: Vec<String> = parts.map(str::to_string).collect();
+                if owners.is_empty() {
+                    return None;
                 }
-            }
-            if !patterns.is_empty() {
-                rules.push(OwnerRule { patterns, owners });
-            }
-        }
-
-        rules
+                let patterns: Vec<Pattern> = codeowners_pattern_to_globs(raw_pattern)
+                    .into_iter()
+                    .flat_map(|gs| {
+                        Pattern::new(&gs).map_err(|_| {
+                            eprintln!("Warning: invalid CODEOWNERS pattern: {raw_pattern}")
+                        })
+                    })
+                    .collect();
+                (!patterns.is_empty()).then_some(Rule { patterns, owners })
+            })
+            .collect()
     }
 
     /// Make a file path relative to the repo root for CODEOWNERS matching.
     fn make_relative(&self, path: &str) -> String {
-        // Try to canonicalize the path, then strip the repo root prefix
-        let abs = Path::new(path)
-            .canonicalize()
-            .unwrap_or_else(|_| PathBuf::from(path));
-
-        if let Ok(rel) = abs.strip_prefix(&self.repo_root) {
-            rel.to_string_lossy().to_string()
-        } else {
-            // Fallback: strip common prefixes like ./
-            let cleaned = path.strip_prefix("./").unwrap_or(path);
-            cleaned.to_string()
-        }
+        Path::new(path)
+            .strip_prefix(&self.repo_root)
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| path.strip_prefix("./").unwrap_or(path).to_string())
     }
 
     /// Find the owners for a given file path. Returns the owners from the last
     /// matching rule (GitHub CODEOWNERS semantics: last match wins).
     fn match_path(&self, relative_path: &str) -> Option<&[String]> {
-        let mut result = None;
-        for rule in &self.rules {
-            if rule.patterns.iter().any(|p| p.matches(relative_path)) {
-                result = Some(rule.owners.as_slice());
-            }
-        }
-        result
+        self.rules
+            .iter()
+            .filter(|r| r.patterns.iter().any(|p| p.matches(relative_path)))
+            .last()
+            .map(|r| r.owners.as_slice())
+    }
+
+    /// Look up the primary owner for an absolute or relative file path.
+    /// Returns the first owner from the last matching rule, or `None` if unowned.
+    pub fn lookup(&self, path: &str) -> Option<String> {
+        let relative = self.make_relative(path);
+        self.match_path(&relative)
+            .and_then(|owners| owners.first())
+            .cloned()
     }
 }
 
@@ -128,7 +116,7 @@ impl Owners {
 /// - `/docs/` matches the `docs/` directory at the repo root
 /// - `docs/` matches any `docs/` directory at any depth
 /// - `/src/foo.ts` matches exactly `src/foo.ts`
-/// - `apps/web/src/connectors` matches the file AND everything under it
+/// - `client/src/auth` matches the file AND everything under it
 ///
 /// The `glob` crate's `*` only matches within a single directory, so we need
 /// to translate patterns to use `**` for cross-directory matching.
@@ -136,55 +124,31 @@ impl Owners {
 /// Returns multiple patterns when a bare path (no glob chars, no trailing `/`)
 /// could refer to either a file or a directory.
 fn codeowners_pattern_to_globs(pattern: &str) -> Vec<String> {
-    let anchored = pattern.starts_with('/');
     let clean = pattern.strip_prefix('/').unwrap_or(pattern);
+    let (base, is_dir) = clean
+        .strip_suffix('/')
+        .map_or((clean, false), |s| (s, true));
 
-    // Trailing `/` means "match everything inside this directory"
-    let (base, is_dir) = if let Some(stripped) = clean.strip_suffix('/') {
-        (stripped, true)
+    if base == "*" {
+        return vec!["**".to_string()];
+    }
+
+    // Patterns without a leading or internal `/` match at any depth.
+    let rooted = pattern.starts_with('/') || base.contains('/');
+    let glob_base = if rooted {
+        base.to_string()
     } else {
-        (clean, false)
+        format!("**/{base}")
     };
+    let has_glob = base.contains('*') || base.contains('?');
 
     if is_dir {
-        if anchored {
-            vec![format!("{base}/**")]
-        } else {
-            vec![format!("**/{base}/**")]
-        }
-    } else if base == "*" {
-        vec!["**".to_string()]
-    } else if !base.contains('*') && !base.contains('?') {
-        // No glob chars: could be a file or directory.
-        // Emit both the exact match and a directory match (path/**).
-        if anchored {
-            vec![base.to_string(), format!("{base}/**")]
-        } else if base.contains('/') {
-            // Has a slash: anchored to root per GitHub docs.
-            vec![base.to_string(), format!("{base}/**")]
-        } else {
-            // Bare name, no slash: matches at any depth.
-            vec![format!("**/{base}"), format!("**/{base}/**")]
-        }
-    } else if anchored {
-        vec![base.to_string()]
-    } else if !base.contains('/') {
-        vec![format!("**/{base}")]
+        vec![format!("{glob_base}/**")]
+    } else if has_glob {
+        vec![glob_base]
     } else {
-        vec![base.to_string()]
-    }
-}
-
-/// Assign CODEOWNERS to file reports. Paths are made relative to the repo root
-/// (derived from the CODEOWNERS file location) before matching.
-pub fn assign_owners(files: &mut [FileReport], owners: &Owners) {
-    for file in files.iter_mut() {
-        let relative = owners.make_relative(&file.path);
-        if let Some(owner_list) = owners.match_path(&relative)
-            && let Some(first) = owner_list.first()
-        {
-            file.owner = Some(first.clone());
-        }
+        // Bare literal: GitHub treats it as matching both a file and a directory prefix.
+        vec![glob_base.clone(), format!("{glob_base}/**")]
     }
 }
 
@@ -193,9 +157,9 @@ mod tests {
     use super::*;
 
     /// Helper to create an Owners with a dummy repo root for unit tests.
-    fn parse_test(contents: &str) -> Owners {
-        Owners {
-            rules: Owners::parse_rules(contents),
+    fn parse_test(contents: &str) -> CodeOwners {
+        CodeOwners {
+            rules: CodeOwners::parse_rules(contents),
             repo_root: PathBuf::from("/dummy"),
         }
     }
@@ -283,26 +247,16 @@ mod tests {
 
     #[test]
     fn bare_directory_without_trailing_slash() {
-        // GitHub treats `apps/web/src/connectors` as matching both the path
+        // GitHub treats `a/b/src` as matching both the path
         // itself and everything under it.
-        let owners = parse_test("apps/web/src/connectors @team-auth\n");
+        let owners = parse_test("a/b/src @team-b\n");
+        assert_eq!(owners.match_path("a/b/src").unwrap(), &["@team-b"]);
+        assert_eq!(owners.match_path("a/b/src/file.ts").unwrap(), &["@team-b"]);
         assert_eq!(
-            owners.match_path("apps/web/src/connectors").unwrap(),
-            &["@team-auth"]
+            owners.match_path("a/b/src/deep/nested.ts").unwrap(),
+            &["@team-b"]
         );
-        assert_eq!(
-            owners
-                .match_path("apps/web/src/connectors/webauthn.ts")
-                .unwrap(),
-            &["@team-auth"]
-        );
-        assert_eq!(
-            owners
-                .match_path("apps/web/src/connectors/deep/nested.ts")
-                .unwrap(),
-            &["@team-auth"]
-        );
-        assert!(owners.match_path("apps/web/src/other.ts").is_none());
+        assert!(owners.match_path("a/b/other.ts").is_none());
     }
 
     #[test]
@@ -328,31 +282,31 @@ mod tests {
         let codeowners = "\
 *.scss @ui-team
 *.css @ui-team
-apps/desktop/desktop_native @platform-dev
-apps/web/src/connectors @auth-dev
-apps/web/src/connectors/platform @platform-dev
-apps/web/src/app/billing @billing-dev
+client/native @platform-dev
+client/web/src/auth @auth-dev
+client/web/src/auth/sso @platform-dev
+client/web/src/billing @billing-dev
 ";
         let owners = parse_test(codeowners);
 
         // .scss at any depth → @ui-team
         assert_eq!(
-            owners.match_path("apps/web/src/styles/main.scss").unwrap(),
+            owners
+                .match_path("client/web/src/styles/main.scss")
+                .unwrap(),
             &["@ui-team"]
         );
 
-        // connectors → @auth-dev
+        // auth → @auth-dev
         assert_eq!(
-            owners
-                .match_path("apps/web/src/connectors/webauthn.ts")
-                .unwrap(),
+            owners.match_path("client/web/src/auth/login.ts").unwrap(),
             &["@auth-dev"]
         );
 
-        // connectors/platform → @platform-dev (last match wins)
+        // auth/sso → @platform-dev (last match wins)
         assert_eq!(
             owners
-                .match_path("apps/web/src/connectors/platform/proxy.html")
+                .match_path("client/web/src/auth/sso/proxy.html")
                 .unwrap(),
             &["@platform-dev"]
         );
@@ -360,13 +314,13 @@ apps/web/src/app/billing @billing-dev
         // billing → @billing-dev
         assert_eq!(
             owners
-                .match_path("apps/web/src/app/billing/settings.ts")
+                .match_path("client/web/src/billing/settings.ts")
                 .unwrap(),
             &["@billing-dev"]
         );
 
         // No match for random ts file
-        assert!(owners.match_path("apps/web/src/main.ts").is_none());
+        assert!(owners.match_path("client/web/src/main.ts").is_none());
     }
 
     #[test]
@@ -385,9 +339,9 @@ apps/web/src/app/billing @billing-dev
 
     #[test]
     fn make_relative_strips_repo_root() {
-        let owners = Owners {
+        let owners = CodeOwners {
             rules: vec![],
-            repo_root: PathBuf::from("/Users/oscar/Code/clients"),
+            repo_root: PathBuf::from("/Users/user/repository"),
         };
         // When canonicalize fails (path doesn't exist on disk), falls back to
         // stripping ./ prefix

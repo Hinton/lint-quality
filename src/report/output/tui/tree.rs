@@ -107,9 +107,7 @@ pub fn build_dir_tree(
                     break;
                 }
             }
-            current
-                .files
-                .push((filename, file_path.clone(), *count));
+            current.files.push((filename, file_path.clone(), *count));
         }
     }
 
@@ -275,11 +273,7 @@ mod tests {
 
     #[test]
     fn deeply_nested_expand() {
-        let dirs = dir_counts(&[
-            ("a", 10),
-            ("a/b", 8),
-            ("a/b/c", 5),
-        ]);
+        let dirs = dir_counts(&[("a", 10), ("a/b", 8), ("a/b/c", 5)]);
         let expanded: HashSet<String> = ["a".to_string(), "a/b".to_string()].into();
         let rows = build_dir_tree(&dirs, &[], &expanded);
 

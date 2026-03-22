@@ -1,8 +1,20 @@
 //! Human-readable terminal report with aligned columns, percentage breakdowns, and color.
 
+use super::fmt_num;
 use crate::report::Report;
 use colored::Colorize;
 use std::fmt::Write;
+
+/// Sort a map's entries by count descending, keeping at most `limit` entries.
+fn sorted_entries(
+    map: &std::collections::HashMap<String, usize>,
+    limit: usize,
+) -> Vec<(&String, &usize)> {
+    let mut items: Vec<_> = map.iter().collect();
+    items.sort_by(|a, b| b.1.cmp(a.1));
+    items.truncate(limit);
+    items
+}
 
 /// Format a scan report for terminal display, with sections for patterns,
 /// categories, top rules, top directories, and owners.
@@ -32,38 +44,21 @@ pub fn format_human(report: &Report) -> String {
 
     let total = s.total_violations;
 
-    // By pattern
     writeln!(out, "{}", "By Pattern:".bold()).unwrap();
-    let mut patterns: Vec<_> = s.by_pattern.iter().collect();
-    patterns.sort_by(|a, b| b.1.cmp(a.1));
-    write_section(&mut out, &patterns, total);
+    write_section(&mut out, &sorted_entries(&s.by_pattern, usize::MAX), total);
 
-    // By category
     writeln!(out, "\n{}", "By Category:".bold()).unwrap();
-    let mut cats: Vec<_> = s.by_category.iter().collect();
-    cats.sort_by(|a, b| b.1.cmp(a.1));
-    write_section(&mut out, &cats, total);
+    write_section(&mut out, &sorted_entries(&s.by_category, usize::MAX), total);
 
-    // Top rules
     writeln!(out, "\n{}", "Top Rules:".bold()).unwrap();
-    let mut rules: Vec<_> = s.by_rule.iter().collect();
-    rules.sort_by(|a, b| b.1.cmp(a.1));
-    rules.truncate(15);
-    write_section(&mut out, &rules, total);
+    write_section(&mut out, &sorted_entries(&s.by_rule, 15), total);
 
-    // Top directories
     writeln!(out, "\n{}", "Top Directories:".bold()).unwrap();
-    let mut dirs: Vec<_> = s.by_directory.iter().collect();
-    dirs.sort_by(|a, b| b.1.cmp(a.1));
-    dirs.truncate(15);
-    write_section(&mut out, &dirs, total);
+    write_section(&mut out, &sorted_entries(&s.by_directory, 15), total);
 
-    // By owner
     if !s.by_owner.is_empty() {
         writeln!(out, "\n{}", "By Owner:".bold()).unwrap();
-        let mut owners: Vec<_> = s.by_owner.iter().collect();
-        owners.sort_by(|a, b| b.1.cmp(a.1));
-        write_section(&mut out, &owners, total);
+        write_section(&mut out, &sorted_entries(&s.by_owner, usize::MAX), total);
     }
 
     out
@@ -79,10 +74,10 @@ fn write_section<K: AsRef<str> + std::fmt::Display>(
         .map(|(name, _)| name.as_ref().len())
         .max()
         .unwrap_or(0);
+    // Items are sorted descending, so the first entry has the largest count and widest string.
     let count_width = items
-        .iter()
+        .first()
         .map(|(_, c)| fmt_num(**c).len())
-        .max()
         .unwrap_or(0);
     for (name, count) in items {
         let pct = if total > 0 {
@@ -104,25 +99,32 @@ fn write_section<K: AsRef<str> + std::fmt::Display>(
     }
 }
 
-fn fmt_num(n: usize) -> String {
-    if n < 1_000 {
-        return n.to_string();
-    }
-    let s = n.to_string();
-    let mut result = String::with_capacity(s.len() + s.len() / 3);
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            result.push(',');
-        }
-        result.push(c);
-    }
-    result.chars().rev().collect()
-}
-
 fn fmt_duration(ms: u64) -> String {
     if ms < 1_000 {
         format!("{}ms", ms)
     } else {
         format!("{:.2}s", ms as f64 / 1_000.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duration_under_1s() {
+        assert_eq!(fmt_duration(0), "0ms");
+        assert_eq!(fmt_duration(999), "999ms");
+    }
+
+    #[test]
+    fn duration_exactly_1s() {
+        assert_eq!(fmt_duration(1_000), "1.00s");
+    }
+
+    #[test]
+    fn duration_fractional_seconds() {
+        assert_eq!(fmt_duration(1_500), "1.50s");
+        assert_eq!(fmt_duration(12_345), "12.35s");
     }
 }

@@ -6,23 +6,28 @@ use crate::report::Report;
 /// Load reports from a list of paths. Each path can be a JSON file or a directory
 /// containing JSON files. Returns reports sorted by timestamp (oldest first).
 pub fn load_reports(paths: &[PathBuf]) -> Result<Vec<Report>> {
-    let mut json_files: Vec<PathBuf> = Vec::new();
-
-    for path in paths {
-        if path.is_dir() {
-            for entry in std::fs::read_dir(path)? {
-                let entry = entry?;
-                let p = entry.path();
-                if p.extension().and_then(|e| e.to_str()) == Some("json") {
-                    json_files.push(p);
-                }
+    let json_files: Vec<PathBuf> = paths
+        .iter()
+        .map(|path| -> Result<Vec<PathBuf>> {
+            if path.is_dir() {
+                std::fs::read_dir(path)?
+                    .map(|e| Ok(e?.path()))
+                    .filter(|r| {
+                        r.as_ref().map_or(true, |p| {
+                            p.extension().and_then(|e| e.to_str()) == Some("json")
+                        })
+                    })
+                    .collect()
+            } else if path.is_file() {
+                Ok(vec![path.clone()])
+            } else {
+                bail!("path does not exist: {}", path.display())
             }
-        } else if path.is_file() {
-            json_files.push(path.clone());
-        } else {
-            bail!("path does not exist: {}", path.display());
-        }
-    }
+        })
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .collect();
 
     if json_files.is_empty() {
         bail!(
@@ -35,21 +40,16 @@ pub fn load_reports(paths: &[PathBuf]) -> Result<Vec<Report>> {
         );
     }
 
-    let mut reports: Vec<Report> = Vec::new();
-    let mut errors: Vec<String> = Vec::new();
+    let (reports, errors): (Vec<_>, Vec<_>) = json_files
+        .iter()
+        .map(|f| load_report(f).map_err(|e| format!("{}: {}", f.display(), e)))
+        .partition(Result::is_ok);
 
-    for file in &json_files {
-        match load_report(file) {
-            Ok(report) => reports.push(report),
-            Err(e) => errors.push(format!("{}: {}", file.display(), e)),
-        }
-    }
+    let mut reports: Vec<Report> = reports.into_iter().map(Result::unwrap).collect();
+    let errors: Vec<String> = errors.into_iter().map(Result::unwrap_err).collect();
 
     if reports.is_empty() {
-        bail!(
-            "failed to load any valid reports:\n{}",
-            errors.join("\n")
-        );
+        bail!("failed to load any valid reports:\n{}", errors.join("\n"));
     }
 
     if !errors.is_empty() {

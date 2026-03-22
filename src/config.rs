@@ -17,25 +17,18 @@ pub fn load_config(
     config_path: &Option<PathBuf>,
     scan_paths: &[PathBuf],
 ) -> Result<(Option<ConfigFile>, Option<String>)> {
-    match config_path {
-        Some(p) => Ok((
+    if let Some(p) = config_path {
+        return Ok((
             Some(load_config_file(p)?),
-            Some(p.to_string_lossy().to_string()),
-        )),
-        None => {
-            let start = scan_paths
-                .first()
-                .map(|p| p.as_path())
-                .unwrap_or(".".as_ref());
-            match discover_config(start) {
-                Some(p) => {
-                    let display = p.to_string_lossy().to_string();
-                    Ok((load_config_file(&p).ok(), Some(display)))
-                }
-                None => Ok((None, None)),
-            }
-        }
+            Some(p.to_string_lossy().into_owned()),
+        ));
     }
+    let start = scan_paths.first().map_or(Path::new("."), PathBuf::as_path);
+    let Some(p) = discover_config(start) else {
+        return Ok((None, None));
+    };
+    let display = p.to_string_lossy().into_owned();
+    Ok((load_config_file(&p).ok(), Some(display)))
 }
 
 /// Raw deserialized content of a `lint-quality.toml` config file.
@@ -83,10 +76,11 @@ pub fn default_extensions() -> Vec<String> {
 /// Walk up from `start` looking for `lint-quality.toml`.
 pub fn discover_config(start: &Path) -> Option<PathBuf> {
     let mut dir = if start.is_file() {
-        start.parent()?.to_path_buf()
+        start.parent()?
     } else {
-        start.to_path_buf()
-    };
+        start
+    }
+    .to_path_buf();
     loop {
         let candidate = dir.join("lint-quality.toml");
         if candidate.is_file() {

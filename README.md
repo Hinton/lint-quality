@@ -1,8 +1,11 @@
 # lint-quality
 
-Detect disabled lint rules in codebases. Define regex patterns in a config file to scan for any type of lint suppression — eslint-disable comments, `@ts-ignore`, `noqa`, `rubocop:disable`, or anything else.
+Detect disabled lint rules in codebases. Define regex patterns in a config file to scan for any type
+of lint suppression — eslint-disable comments, `@ts-ignore`, `noqa`, `rubocop:disable`, or anything
+else.
 
-Produces reports by file, directory, rule, violation type, and CODEOWNERS. JSON output supports trend comparison across runs.
+Produces reports by file, directory, rule, violation type, and CODEOWNERS. JSON output supports
+trend comparison across runs.
 
 ## Usage
 
@@ -12,12 +15,12 @@ lint-quality scan [paths...] [options]
 
 ### Options
 
-| Flag                     | Description                                    |
-| ------------------------ | ---------------------------------------------- |
-| `--format human\|json`   | Output format (default: `human`)               |
-| `--config <path>`        | Path to config file (overrides auto-discovery) |
-| `--codeowners <path>`    | Path to CODEOWNERS file                        |
-| `--extensions js,ts,...` | File extensions to scan (comma-separated)      |
+| Flag                        | Description                                    |
+| --------------------------- | ---------------------------------------------- |
+| `--format human\|json\|tui` | Output format (default: `human`)               |
+| `--config <path>`           | Path to config file (overrides auto-discovery) |
+| `--codeowners <path>`       | Path to CODEOWNERS file                        |
+| `--extensions js,ts,...`    | File extensions to scan (comma-separated)      |
 
 ### Examples
 
@@ -32,9 +35,33 @@ lint-quality scan src apps --format json
 lint-quality scan --config ./lint-quality.toml src
 ```
 
+### TUI output
+
+```sh
+lint-quality scan src --format tui
+```
+
+Or re-open a saved JSON report in the TUI:
+
+```sh
+lint-quality read report.json --format tui
+```
+
+The TUI has two panels:
+
+- **Left — Filters**: Browse and toggle filters by Pattern, Category, Rule, or Owner. Use `←`/`→` to
+  switch filter dimensions; `Space`/`Enter` to toggle a value; `c` to clear all filters.
+- **Right — Data**: View violations aggregated by Files, Rules, Patterns, Categories, Owners, or
+  Directories. Use `←`/`→` to switch views. In the Directories view, `Space`/`Enter` expands or
+  collapses a directory.
+
+Press `Tab` to move focus between panels. Navigate rows with `↑`/`↓` (or `j`/`k`). Press `q` or
+`Esc` to quit.
+
 ## Configuration
 
-Create a `lint-quality.toml` in your project root. The tool auto-discovers this file by walking up from the scanned directory.
+Create a `lint-quality.toml` in your project root. The tool auto-discovers this file by walking up
+from the scanned directory.
 
 ### Starter config for JavaScript/TypeScript
 
@@ -148,7 +175,8 @@ extract_rules = true
 
 ### Config resolution
 
-The config file is auto-discovered by walking up from the scan directory, or specified explicitly with `--config`. CLI args override config file values; patterns are config-file-only.
+The config file is auto-discovered by walking up from the scan directory, or specified explicitly
+with `--config`. CLI args override config file values.
 
 ## Trend dashboard
 
@@ -165,7 +193,8 @@ lint-quality trend report-jan.json report-feb.json report-mar.json
 lint-quality trend reports/ --port 9000 --no-open
 ```
 
-The dashboard shows all dimensions (total, owner, category, rule, pattern, directory) on a single page with:
+The dashboard shows all dimensions (total, owner, category, rule, pattern, directory) on a single
+page with:
 
 - **Trend charts** — violation counts over time for each dimension
 - **Summary tables** — first vs. latest report comparison with delta and percent change

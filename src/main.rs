@@ -2,8 +2,8 @@
 //! pattern compilation, file scanning, CODEOWNERS assignment, and report output.
 
 mod cli;
+mod codeowners;
 mod config;
-mod owners;
 mod report;
 mod scan;
 mod trend;
@@ -54,9 +54,11 @@ fn main() -> Result<()> {
             let duration = start_time.elapsed();
 
             if let Some(ref co_path) = resolved.codeowners
-                && let Some(co) = owners::Owners::from_file(co_path)
+                && let Some(co) = codeowners::CodeOwners::from_file(co_path)
             {
-                owners::assign_owners(&mut scan_result.files, &co);
+                for file in &mut scan_result.files {
+                    file.owner = co.lookup(&file.path);
+                }
             }
 
             let report = report::build(scan_result, &resolved, resolved_config_path, duration);

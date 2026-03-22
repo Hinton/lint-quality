@@ -42,11 +42,9 @@ fn run_app(mut terminal: DefaultTerminal, report: &Report) -> Result<()> {
 
             draw_header(f, &app, header_area);
 
-            let [left_area, right_area] = Layout::horizontal([
-                Constraint::Percentage(35),
-                Constraint::Percentage(65),
-            ])
-            .areas(body_area);
+            let [left_area, right_area] =
+                Layout::horizontal([Constraint::Percentage(35), Constraint::Percentage(65)])
+                    .areas(body_area);
 
             draw_filter_panel(f, &mut app, left_area);
             draw_data_panel(f, &mut app, right_area);

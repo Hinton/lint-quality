@@ -301,8 +301,11 @@ impl<'a> App<'a> {
             .iter()
             .map(|(path, _, count)| (path.clone(), *count))
             .collect();
-        self.dir_tree_rows =
-            build_dir_tree(&self.filtered_dir_counts, &file_entries, &self.expanded_dirs);
+        self.dir_tree_rows = build_dir_tree(
+            &self.filtered_dir_counts,
+            &file_entries,
+            &self.expanded_dirs,
+        );
     }
 
     pub fn toggle_dir_expand(&mut self) {
@@ -383,9 +386,10 @@ impl<'a> App<'a> {
         if len == 0 {
             return;
         }
-        let i = self.filter_list_state.selected().map_or(0, |i| {
-            if i >= len - 1 { 0 } else { i + 1 }
-        });
+        let i = self
+            .filter_list_state
+            .selected()
+            .map_or(0, |i| if i >= len - 1 { 0 } else { i + 1 });
         self.filter_list_state.select(Some(i));
     }
 
@@ -394,9 +398,10 @@ impl<'a> App<'a> {
         if len == 0 {
             return;
         }
-        let i = self.filter_list_state.selected().map_or(0, |i| {
-            if i == 0 { len - 1 } else { i - 1 }
-        });
+        let i = self
+            .filter_list_state
+            .selected()
+            .map_or(0, |i| if i == 0 { len - 1 } else { i - 1 });
         self.filter_list_state.select(Some(i));
     }
 
@@ -406,9 +411,9 @@ impl<'a> App<'a> {
             return;
         }
         let state = &mut self.data_states[self.data_view];
-        let i = state.selected().map_or(0, |i| {
-            if i >= len - 1 { 0 } else { i + 1 }
-        });
+        let i = state
+            .selected()
+            .map_or(0, |i| if i >= len - 1 { 0 } else { i + 1 });
         state.select(Some(i));
     }
 
@@ -418,9 +423,9 @@ impl<'a> App<'a> {
             return;
         }
         let state = &mut self.data_states[self.data_view];
-        let i = state.selected().map_or(0, |i| {
-            if i == 0 { len - 1 } else { i - 1 }
-        });
+        let i = state
+            .selected()
+            .map_or(0, |i| if i == 0 { len - 1 } else { i - 1 });
         state.select(Some(i));
     }
 }
@@ -435,9 +440,9 @@ fn sorted_vec(map: HashMap<String, usize>) -> Vec<(String, usize)> {
 mod tests {
     use super::*;
     use crate::report::analysis::build_summary;
+    use crate::report::{Report, ReportMetadata};
     use crate::scan::{FileReport, Violation};
     use chrono::Utc;
-    use crate::report::{Report, ReportMetadata};
 
     fn make_violation(pattern: &str, category: &str, rules: &[&str]) -> Violation {
         Violation {
@@ -478,9 +483,11 @@ mod tests {
             FileReport {
                 path: "src/bar.ts".to_string(),
                 owner: Some("@team-b".to_string()),
-                violations: vec![
-                    make_violation("eslint-disable-next-line", "eslint", &["no-unused-vars"]),
-                ],
+                violations: vec![make_violation(
+                    "eslint-disable-next-line",
+                    "eslint",
+                    &["no-unused-vars"],
+                )],
             },
             FileReport {
                 path: "lib/utils.js".to_string(),
@@ -632,7 +639,11 @@ mod tests {
         assert_eq!(app.filtered_owners.len(), 1);
         assert_eq!(app.filtered_owners[0].0, "@team-a");
         // Check patterns breakdown
-        let pattern_names: Vec<&str> = app.filtered_patterns.iter().map(|(n, _)| n.as_str()).collect();
+        let pattern_names: Vec<&str> = app
+            .filtered_patterns
+            .iter()
+            .map(|(n, _)| n.as_str())
+            .collect();
         assert!(pattern_names.contains(&"eslint-disable-next-line"));
         assert!(pattern_names.contains(&"eslint-disable"));
         assert!(pattern_names.contains(&"ts-ignore"));

@@ -10,6 +10,7 @@ use ratatui::{
 };
 
 use super::app::{App, DATA_VIEWS, DIMENSIONS, DataView, Focus};
+use super::super::fmt_num;
 
 pub fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     let s = &app.report.summary;
@@ -293,13 +294,7 @@ fn draw_stats_table(
     f.render_stateful_widget(table, area, &mut app.data_states[app.data_view]);
 }
 
-fn draw_dir_tree(
-    f: &mut Frame,
-    app: &mut App,
-    area: Rect,
-    block: Block,
-    highlight_style: Style,
-) {
+fn draw_dir_tree(f: &mut Frame, app: &mut App, area: Rect, block: Block, highlight_style: Style) {
     let header = Row::new(vec![
         Cell::from("Directory").style(Style::default().add_modifier(Modifier::BOLD)),
         Cell::from("Count").style(Style::default().add_modifier(Modifier::BOLD)),
@@ -393,21 +388,6 @@ pub fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-pub fn fmt_num(n: usize) -> String {
-    if n < 1_000 {
-        return n.to_string();
-    }
-    let s = n.to_string();
-    let mut result = String::with_capacity(s.len() + s.len() / 3);
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            result.push(',');
-        }
-        result.push(c);
-    }
-    result.chars().rev().collect()
-}
-
 fn bar_string(count: usize, max: usize, width: usize) -> String {
     if max == 0 {
         return String::new();
@@ -419,22 +399,6 @@ fn bar_string(count: usize, max: usize, width: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn fmt_num_small() {
-        assert_eq!(fmt_num(0), "0");
-        assert_eq!(fmt_num(1), "1");
-        assert_eq!(fmt_num(999), "999");
-    }
-
-    #[test]
-    fn fmt_num_thousands() {
-        assert_eq!(fmt_num(1_000), "1,000");
-        assert_eq!(fmt_num(1_234), "1,234");
-        assert_eq!(fmt_num(12_345), "12,345");
-        assert_eq!(fmt_num(123_456), "123,456");
-        assert_eq!(fmt_num(1_234_567), "1,234,567");
-    }
 
     #[test]
     fn bar_string_full_width() {

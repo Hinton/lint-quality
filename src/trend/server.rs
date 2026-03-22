@@ -1,7 +1,7 @@
+use axum::Router;
 use axum::extract::State;
 use axum::http::{StatusCode, Uri, header};
 use axum::response::{Html, IntoResponse, Response};
-use axum::Router;
 use rust_embed::Embed;
 use std::sync::Arc;
 
@@ -23,9 +23,7 @@ pub async fn serve(reports: Vec<Report>, port: u16, no_open: bool) -> anyhow::Re
         reports_json: Arc::new(reports_json),
     };
 
-    let app = Router::new()
-        .fallback(static_handler)
-        .with_state(state);
+    let app = Router::new().fallback(static_handler).with_state(state);
 
     let addr = format!("127.0.0.1:{}", port);
     let listener = tokio::net::TcpListener::bind(&addr).await?;
