@@ -9,7 +9,7 @@ use crate::report::Report;
 
 #[derive(Embed)]
 #[folder = "web/dist/"]
-struct Assets;
+pub(super) struct Assets;
 
 #[derive(Clone)]
 struct AppState {

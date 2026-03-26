@@ -242,3 +242,64 @@ fn no_patterns_error() {
 
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn trend_export_produces_static_site() {
+    // First, generate a JSON report by scanning the fixtures
+    let scan_output = cargo_bin()
+        .args(["scan", "tests/fixtures", "--format", "json"])
+        .output()
+        .expect("failed to execute scan");
+    assert!(scan_output.status.success());
+
+    // Write the report to a temp file
+    let dir = std::env::temp_dir().join("lint-quality-test-export");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let report_path = dir.join("report.json");
+    std::fs::write(&report_path, &scan_output.stdout).unwrap();
+
+    let export_dir = dir.join("exported");
+
+    // Run trend with --export
+    let output = cargo_bin()
+        .args([
+            "trend",
+            report_path.to_str().unwrap(),
+            "--export",
+            export_dir.to_str().unwrap(),
+        ])
+        .output()
+        .expect("failed to execute trend --export");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // stdout should print the path to index.html
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("index.html"),
+        "stdout should print index.html path, got: {}",
+        stdout
+    );
+
+    // index.html should exist and contain injected reports
+    let index = export_dir.join("index.html");
+    assert!(index.exists(), "index.html should exist");
+    let content = std::fs::read_to_string(&index).unwrap();
+    assert!(
+        content.contains("window.__REPORTS__="),
+        "index.html should contain injected reports"
+    );
+
+    // The report data should be embedded in the HTML
+    assert!(
+        content.contains("eslint-disable-next-line"),
+        "embedded report data should include violation patterns"
+    );
+
+    std::fs::remove_dir_all(&dir).ok();
+}
