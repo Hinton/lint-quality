@@ -203,6 +203,38 @@ page with:
 - **Insights** — auto-generated observations about biggest improvements and regressions
 - **Drag & drop** — upload additional JSON reports directly in the browser
 
+### Exporting a static report
+
+Use `--export <dir>` to write the dashboard as a self-contained static site instead of launching a
+server. The exported directory can be opened directly via `file://`, hosted on any static file
+server, or attached as a CI artifact.
+
+```sh
+# Export to a directory
+lint-quality trend reports/ --export dist/report
+
+# Open dist/report/index.html in a browser to view
+```
+
+The command prints the path to the generated `index.html` on stdout, exits immediately, and does not
+start a server.
+
+#### Using the export in CI
+
+```yaml
+# GitHub Actions example
+- name: Generate lint-quality report
+  run: |
+    lint-quality scan src --format json > report.json
+    lint-quality trend report.json --export report-site
+
+- name: Upload report artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: lint-quality-report
+    path: report-site/
+```
+
 ### Generating reports for trending
 
 Save JSON reports from each scan run, e.g. in CI:

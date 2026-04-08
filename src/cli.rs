@@ -52,6 +52,10 @@ pub enum Commands {
         /// Don't automatically open the browser
         #[arg(long)]
         no_open: bool,
+
+        /// Export static HTML report to the given directory instead of starting a server
+        #[arg(long)]
+        export: Option<PathBuf>,
     },
 
     /// Read a previously saved JSON report

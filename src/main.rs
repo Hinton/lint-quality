@@ -69,8 +69,9 @@ fn main() -> Result<()> {
             paths,
             port,
             no_open,
+            export,
         } => {
-            trend::run(paths, port, no_open)?;
+            trend::run(paths, port, no_open, export)?;
         }
 
         Commands::Read { path, format } => {
